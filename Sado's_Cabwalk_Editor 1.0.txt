@@ -1,0 +1,987 @@
+@name Sado's Cabwalk Editor 1.0
+@persist Wave Wave2 SelArea Editing AreaIndex PortalIndex [Areas Portals ExportAreas]:table [IndexedEnts TempArea TempPortal UndoHistory]:array Ent:entity
+@persist [SoundCancel SoundFail SoundDone SoundConfirm Step]:string O:entity
+@model models/props_c17/oildrum001.mdl
+if(first()){
+    #[
+    Welcome to Sado's Cabwalk Editor E2. You can use this tool to create an areamap.
+    
+    Making large areamaps may hit the print() limit. Change the print limit by opening your console and typing:
+    wire_expression2_print_max 1000
+    
+    If the holograms don't spawn, press R to cancel and try again.
+    You cannot undo an area/path/portal you have already created. If you confirm an area as a mistake, you have to refresh the E2.
+    
+    Creating an areamap
+    In order to create an areamap you need to hold your crowbar and type the following commands:
+    "-c area" or "-c a" to make an area. Areas are rectangular and you can walk all over them. Cannot be angled.
+    "-c path" or "-c p" to make a path. Paths are a lines between two points where you can walk from one to the other. They can be angled and be sloped.
+    "-c portal" or "-c x" to make a portal. Portals connect areas/paths together. You can change their node size with -c node <radius>.
+    "-c export" or "-c e" to export the areamap. You can then copy the areamap and copy it into the simulator E2.
+    "-c undo" or "-c u" to undo your last action.
+    
+    Creating an area:
+    1. First you need to select a parent entity. The parent entity is what the area will be relative to. This would normally be the baseplate.
+       Note the E2 might not work if the baseplate is rotated. If the numbers are mirrored, your baseplate is upside down.
+    2. Select the starting point of the area. This is the first corner of the area.
+    3. Select the second point of the area. This will create a rectangle.
+    4. Select the height of the area. In case you want the area to be lower or higher than the points you selected, you can change it here.
+    
+    Creating a path:
+    1. First you need to select a parent entity.
+    2. Select the starting point of the. This is one end of the path.
+    3. Select the ending point of the path.
+    
+    Creatnig a portal:
+    1. Select the area/path you want a portal from by right clicking. The selected area will be blue.
+       You can type "-c node <radius>" or "-c n <radius>" to change the radius of the node. You can type "-c sel <area>" or "-c s <area>" to select an area by its index.
+    2. Select the area/path you want a portal to by right clicking. Same rules apply.
+    
+    Exporting configuration:
+    When you're done with the areamap, you can type "-c export" or "-c e" to export the configuration. The configuration will show up in chat and console.
+    Copy this configuration and paste it into the simulator E2.
+    
+    After you've exported the configuration, you can delete this E2.
+    
+    
+    
+    
+    
+    
+    Edit below at your own risk
+    
+    
+    
+    
+    
+    
+    
+    
+    Areas is a table of arrays consisting of:
+    [1,entity] - parent entity
+    [2,number] - isPath
+    [3,vector] - path pos 1
+    [4,vector] - path pos 2
+    [5,vector] - area pos
+    [6,vector] - area scale
+    
+    Portals is a table of arrays consisting of:
+    [1,number] - parent in index
+    [2,number] - parent out index
+    [3,vector] - portal in pos area
+    [4,vector] - portal exit pos area
+    [5,number] - portal in pos path
+    [6,number] - portal exit pos path
+    [7,number] - portal in node radius
+    [8,number] - portal out node radius
+    [9,number] - wire input (unused in editor)
+    ]#
+    
+    
+    UndoHistory = array()
+    
+    O = owner()
+    Areas =  table()
+    Portals =  table()
+    
+    runOnChat(1)
+    runOnKeys(O,1)
+    
+    SoundConfirm = "buttons/blip1.wav"
+    SoundDone = "buttons/bell1.wav"
+    SoundFail = "buttons/button10.wav"
+    SoundCancel = "buttons/button11.wav"
+
+    function string vecToString(Vector:vector){
+        
+        return "vec("+Vector:x()+","+Vector:y()+","+Vector:z()+")"
+        
+    }
+    
+    function vector areaClamp(Pos:vector, Scale:vector, PosIn:vector){ 
+        
+        return clamp(PosIn,Pos-Scale/2,Pos+Scale/2)
+        
+    }
+    
+    function holoInterpolate(Index, Ent:entity, Pos1:vector, Pos2:vector){
+        
+        holoPos(Index,Ent:toWorld((Pos1 + Pos2)/2))
+        holoAng(Index,Ent:toWorld((Pos1 - Pos2):toAngle()))
+        holoScale(Index,vec(Pos1:distance(Pos2)/96,0.03,0.03))     
+           
+    }
+    
+    function holoInterpolate(Index, Pos1:vector, Pos2:vector){
+        
+        holoPos(Index,(Pos1 + Pos2)/2)
+        holoAng(Index,(Pos1 - Pos2):toAngle())
+        holoScale(Index,vec(Pos1:distance(Pos2)/96,0.03,0.03))    
+            
+    }
+    
+    function number linePoint(Pos1:vector, Pos2:vector, Point:vector){
+        
+        P1P2 = Pos2-Pos1
+        P1S = Point-Pos1
+        
+        P1P2sq = P1P2:x()^2+P1P2:y()^2+P1P2:z()
+        Proportion = P1S:dot(P1P2)/P1P2sq
+    
+        return clamp(Proportion,0,1)
+        
+    }
+    
+}
+
+elseif(clk()){
+    
+    interval(100)
+    
+    local Crowbar = O:weapon():type() == "weapon_crowbar"
+    
+    if(Crowbar){
+        
+        AimEnt = !owner():aimEntity():isPlayer() ? owner():aimEntity() : noentity()
+        AimPos = owner():aimPos()
+        AimPosLocal = round(TempArea[1,entity]:toLocal(O:aimPos()),1)
+        
+        switch(Step){
+
+            case "area1",
+            case "path1",
+            
+                if(changed(AimEnt)){
+                    
+                    holoModel(AreaIndex,AimEnt:model())
+                    holoPos(AreaIndex,AimEnt:pos())
+                    holoAng(AreaIndex,AimEnt:angles())
+                    
+                }
+                
+            break
+            
+            case "area2",
+            case "path2",
+            
+                holoPos(AreaIndex,AimPos)    
+                        
+            break     
+                   
+            case "area3",  
+               
+                holoPos(AreaIndex,Ent:toWorld(mix(TempArea[3,vector],AimPosLocal,0.5)))
+                holoScale(AreaIndex,positive(positive(TempArea[3,vector]-AimPosLocal)/96)+vec(0.01))         
+                   
+            break
+            
+            case "area4",
+            
+                holoPos(AreaIndex,Ent:toWorld(mix(TempArea[3,vector],TempArea[4,vector],0.5)*vec(1,1,0)+vec(0,0,AimPosLocal:z())))
+                
+            break        
+                
+            case "path3",
+            
+                holoInterpolate(AreaIndex,Ent,TempArea[3,vector],AimPosLocal)
+                
+            break
+            
+            case "portal1",
+            
+                Selected = Areas[SelArea,array]
+                AimPosLocalSelected = round(Selected[1,entity]:toLocal(O:aimPos()),1)
+                
+                if(Selected[2,number] == 0){ #Render portal node if it's an area
+                    
+                    local S5 = Selected[5,vector]
+                    local S6 = Selected[6,vector]
+                    
+                    holoPos(PortalIndex,Selected[1,entity]:toWorld(areaClamp(S5,S6,AimPosLocalSelected)))
+                    
+                }
+                else{#Render portal node if it's a path
+                    
+                    holoPos(PortalIndex,Selected[1,entity]:toWorld(mix(Selected[4,vector],Selected[3,vector],linePoint(Selected[3,vector],Selected[4,vector],round(Selected[1,entity]:toLocal(O:aimPos()),1)))))
+                    
+                }
+                
+            break
+            
+            case "portal2",
+            
+                Selected = Areas[SelArea,array]
+                AimPosLocalSelected = round(Selected[1,entity]:toLocal(O:aimPos()),1)
+                
+                if(Selected[2,number] == 0){ #Render portal node if it's an area
+                    
+                    local S5 = Selected[5,vector]
+                    local S6 = Selected[6,vector]
+                    
+                    holoPos(PortalIndex+1,Selected[1,entity]:toWorld(areaClamp(S5,S6,AimPosLocalSelected)))        
+                    
+                }
+                else{#Render portal node if it's a path
+                    
+                    holoPos(PortalIndex+1,Selected[1,entity]:toWorld(mix(Selected[4,vector],Selected[3,vector],linePoint(Selected[3,vector],Selected[4,vector],round(Selected[1,entity]:toLocal(O:aimPos()),1)))))
+
+                }
+                
+                holoInterpolate(PortalIndex+2,holoEntity(PortalIndex):pos(),holoEntity(PortalIndex+1):pos())
+                
+            break
+            
+        }
+        
+    }
+    
+    for(I=1,Portals:count()){
+        
+        holoInterpolate(102+(I-1)*3,holoEntity(100+(I-1)*3):pos(),holoEntity(101+(I-1)*3):pos())
+        
+    }
+    
+}
+elseif(chatClk(O)){
+    
+    local Crowbar = O:weapon():type() == "weapon_crowbar"
+    local LS = O:lastSaid()
+    local Words = LS:explode(" ")
+    
+    local Word1 = Words[1,string]
+    
+    if(Word1 == "-c"){
+        
+        hideChat(1)
+        
+        local Word2 = Words[2,string]
+        
+        if(Crowbar){
+            
+            switch(Word2){
+                
+                case "a",
+                case "area",
+                
+                    if(!Editing){
+                        
+                        O:soundPlay(1,0,SoundConfirm)
+                        Editing = 1
+                        interval(100)
+                        AreaIndex = Areas:count()
+                        Step = "area1"
+                        TempArea = array(0,0)
+                        
+                    }
+                    else{
+                        
+                        print("Error! You are already creating something. Press R with the crowbar to undo/cancel.")
+                        O:soundPlay(1,0,SoundFail)
+                        
+                    }                
+                
+                break
+                
+                case "p",
+                case "path",
+                
+                    if(!Editing){
+                        
+                        O:soundPlay(1,0,SoundConfirm)
+                        Editing = 1
+                        interval(100)
+                        AreaIndex = Areas:count()
+                        Step = "path1"
+                        TempArea = array(0,1)  
+                                         
+                    }
+                    else{
+                        
+                        print("Error! You are already creating something. Press R with the crowbar to undo/cancel.")
+                        O:soundPlay(1,0,SoundFail)
+                        
+                    }   
+                                 
+                break
+                
+                case "x",
+                case "portal",
+                
+                    if(!Editing&Areas:count()>0){
+                        
+                        O:soundPlay(1,0,SoundConfirm)
+                        Editing = 1
+                        interval(100)
+                        PortalIndex = 100 + Portals:count()*3
+                        Step = "portal1"
+                        TempPortal =  array(0,0,0,0,0,0,6,6,1)    
+                    
+                    }
+                    elseif(Editing){
+                        
+                        print("Error! You are already creating something. Press R with the crowbar to undo/cancel.")
+                        O:soundPlay(1,0,SoundFail)
+                        
+                    }       
+                    else{
+                        
+                        print("Error! You need at least one area/path to create a portal.")
+                        O:soundPlay(1,0,SoundFail)
+                        
+                    }     
+                        
+                break
+                
+                case "n",
+                case "node",
+                
+                    local Word3 = Words[3,string]:toNumber()
+
+                    if(Step == "portal1"){
+                        
+                        O:soundPlay(1,0,SoundConfirm)
+                        TempPortal[7,number] = Word3
+                        holoScale(PortalIndex,vec(Word3/6))
+                        
+                    }
+                    elseif(Step == "portal2"){
+                        
+                        O:soundPlay(1,0,SoundConfirm)
+                        TempPortal[8,number] = Word3
+                        holoScale(PortalIndex+1,vec(Word3/6))
+                        
+                    }
+                    else{
+                        
+                        O:soundPlay(1,0,SoundFail)
+                        print("You can only change node sizes while creating portals.")
+                        
+                    }
+                    
+                break
+                
+                case "e",
+                case "export",
+                
+                    if(!Editing){
+
+                        ExportAreas = Areas:clone()
+                        print("Exporting...")
+                        
+                        timer("export1",0)
+                    }
+                    else{
+                        
+                        print("Error! Finish or cancel before exporting.")
+                        O:soundPlay(1,0,SoundFail)
+                        
+                    }
+                break
+                
+                case "u",
+                case "undo",
+                    
+                    if(UndoHistory:count()){
+                        
+                        Undo = UndoHistory:popString()
+                        
+                        if(Undo == "Area"){
+                                
+                            Areas:popArray()
+                            holoDelete(AreaIndex)
+                            print(AreaIndex)
+                            AreaIndex = Areas:count()-1
+                            print(AreaIndex)
+                        
+                        }
+                        elseif(Undo == "Portal"){
+                                
+                            Portals:popArray()
+                            holoDelete(PortalIndex)
+                            holoDelete(PortalIndex+1)
+                            holoDelete(PortalIndex+2)
+                            PortalIndex = 100 + Portals:count()*3-3
+                        
+                        }
+                        O:soundPlay(1,0,SoundCancel)
+                            
+                    }
+                    else{
+                        
+                        O:soundPlay(1,0,SoundFail)
+                        print("There is nothing to undo.")
+                        
+                    }
+                        
+                    
+                break
+                
+                case "sel",
+                case "s",
+                
+                    if(Step == "portal1" | Step == "portal2"){
+                        
+                        local Word3 = Words[3,string]:toNumber()
+                        
+                        if(Word3 > 0 & Word3 <= Areas:count()){
+                            
+                            SelArea = Word3
+                            for(I=1,Areas:count()){holoColor(I-1,SelArea==I ? vec(50,100,200) :    vec(50,200,100))}
+                            
+                        }
+                        else{
+                            
+                            O:soundPlay(1,0,SoundFail)
+                            print("Error! Area "+Word3+" does not exist!")
+                            
+                            }
+                        
+                    }
+                    else{
+                        
+                        O:soundPlay(1,0,SoundFail)
+                        print("Error! You can only select areas when making portal nodes.")
+                        
+                    }
+                    
+                break
+                
+                default,
+                
+                    O:soundPlay(1,0,SoundFail)
+                    print("Error! Invalid input.")
+                    
+                break
+                
+            }
+            
+        }
+        
+        else{
+            
+            print("Error! You must be holding the crowbar to create.")
+            O:soundPlay(1,0,SoundFail)
+            
+        }
+        
+    }
+    
+}
+
+elseif(changed(Step)){
+    
+    switch(Step){
+        
+        case "area1",
+        case "path1",
+        
+            print("You are now creating "+( Step == "area1" ? "an area" : "a path")+". Left click the parent entity. Press R to cancel.")
+            
+            local AimEnt = !owner():aimEntity():isPlayer() ? owner():aimEntity() : noentity()
+            
+            holoCreate(AreaIndex)
+            holoMaterial(AreaIndex,"models/debug/debugwhite")
+            holoColor(AreaIndex,vec(50,200,100))
+            holoScale(AreaIndex,vec(1.01))
+            
+            holoModel(AreaIndex,AimEnt:model())
+            holoPos(AreaIndex,AimEnt:pos())
+            holoAng(AreaIndex,AimEnt:angles())
+
+        break
+    
+        case "area2",
+        case "path2",
+        
+            print("Left click one end of the "+( Step == "area2" ? "area" : "path")+" to start. Press R to undo.")
+            
+            holoParent(AreaIndex,TempArea[1,entity])
+            holoAng(AreaIndex,TempArea[1,entity]:angles())
+            holoModel(AreaIndex,"sphere")
+            holoScale(AreaIndex,vec(0.2))
+            
+        break        
+        
+        case "path3",
+        case "area3", 
+        
+            print("Left click the other end of the "+( Step == "area3" ? "area" : "path")+". Press R to undo.")
+            
+            Digits = (AreaIndex+1):toString():explode("")
+            
+            for(I=1,Digits:count()){
+                
+                holoCreate(500+AreaIndex*2+I)
+                holoParent(500+AreaIndex*2+I,holoEntity(AreaIndex))
+                holoPos(500+AreaIndex*2+I,holoEntity(AreaIndex):toWorld(vec(3-I*2,0,0)))
+                holoAng(500+AreaIndex*2+I,holoEntity(AreaIndex):toWorld(ang(0,0,90)))
+                holoModel(500+AreaIndex*2+I,"models/sprops/misc/alphanum/alphanum_"+Digits[I,string]:toNumber()+".mdl")
+                holoScale(500+AreaIndex*2+I,vec(0.2,0.4+( Step == "path3" ? 0.6 : 0),0.2))
+                holoMaterial(500+AreaIndex*2+I,"models/debug/debugwhite")
+                holoColor(500+AreaIndex*2+I,vec(0))
+            
+            }
+
+            
+            holoModel(AreaIndex,"models/hunter/blocks/cube2x2x2.mdl")
+            
+        break
+        
+        case "area4",
+        
+            print("Choose the height of the area. (Usually by left clicking the ground) Press R to undo.")
+            
+            holoScale(AreaIndex,holoScale(AreaIndex)*vec(1,1,0)+vec(0,0,0.01))     
+            
+        break
+        
+        case "portal1",
+        
+            print("You are now creating a portal. Right click to cycle through areas. Type '-c node <number>' to change the node radius. Type '-c sel <number>' to select area. Left click to place a node. Press R to cancel.")
+            
+            holoCreate(PortalIndex)
+            holoModel(PortalIndex,"hqsphere")
+            
+            holoCreate(PortalIndex+1)
+            holoModel(PortalIndex+1,"hqsphere")
+
+            holoCreate(PortalIndex+2)
+            holoMaterial(PortalIndex+2,"models/debug/debugwhite")
+            holoScale(PortalIndex+2,vec(0.1))
+            holoModel(PortalIndex+2,"models/hunter/blocks/cube2x2x2.mdl")
+                      
+            SelArea = 1
+            
+            for(I=1,Areas:count()){holoColor(I-1,SelArea==I ? vec(50,100,200) :    vec(50,200,100))}
+            
+        break
+        
+        case "portal2",
+        
+            print("Now select the other side of the portal. Right click to cycle through areas. Type '-c node <number>' to change the node radius. Type '-c sel <number>' to select area. Press R to cancel.")
+            
+            SelArea = 1
+            
+            for(I=1,Areas:count()){holoColor(I-1,SelArea==I ? vec(50,100,200) :    vec(50,200,100))}
+
+            Digits = ((PortalIndex-100)/3+1):toString():explode("")
+            
+            for(I=1,Digits:count()){
+                
+                holoCreate(1000+PortalIndex*2+I)
+                holoParent(1000+PortalIndex*2+I,holoEntity(PortalIndex+2))
+                holoPos(1000+PortalIndex*2+I,holoEntity(PortalIndex+2):toWorld(vec(3-I*2,0,0)))
+                holoAng(1000+PortalIndex*2+I,holoEntity(PortalIndex+2):toWorld(ang(0,0,90)))
+                holoModel(1000+PortalIndex*2+I,"models/sprops/misc/alphanum/alphanum_"+Digits[I,string]:toNumber()+".mdl")
+                holoScale(1000+PortalIndex*2+I,vec(0.2,1,0.2))
+                holoMaterial(1000+PortalIndex*2+I,"models/debug/debugwhite")
+                holoColor(1000+PortalIndex*2+I,vec(0))
+            
+            }            
+        break
+        
+    }
+    
+}
+
+elseif(keyClk()){
+    
+    Crowbar = O:weapon():type()=="weapon_crowbar"
+    M1 = changed(O:keyAttack1())&O:keyAttack1()
+    M2 = changed(O:keyAttack2())&O:keyAttack2()
+    R = changed(O:keyPressed("R"))&O:keyPressed("R")
+    
+    if(Crowbar&(M1+M2+R)){
+        
+        local AimPosLocal = round(TempArea[1,entity]:toLocal(O:aimPos()),1)
+        AimEnt = !owner():aimEntity():isPlayer() ? owner():aimEntity() : noentity()
+        
+        switch(Step){
+            
+            case "path1",
+            case "area1",
+            
+                if(M1){
+                    
+                    if(AimEnt){
+                        
+                        O:soundPlay(1,0,SoundConfirm)
+                        TempArea[1,entity] = Ent = AimEnt
+                        Step = (Step == "area1" ? "area2" : "path2")
+                        
+                    }
+                    else{
+                        
+                        print("Error! Invalid entity. Try again.")
+                        
+                    }
+                    
+                }
+                elseif(R){
+                    
+                    print("Cancelled "+(Step == "area1" ? "area" : "path")+" creation.")
+                    
+                    Step = ""
+                    Editing = 0
+                    
+                    holoDelete(AreaIndex)
+                    O:soundPlay(1,0,SoundCancel)
+                    TempArea = array()
+                }
+                
+            break
+            
+            case "path2",
+            case "area2",
+            
+                if(M1){
+                    
+                    TempArea[3,vector] = AimPosLocal
+                    
+                    O:soundPlay(1,0,SoundConfirm)
+                    Step = (Step == "area2" ? "area3" : "path3")
+                }
+                elseif(R){
+                    
+                    Step = (Step == "area2" ? "area1" : "path1")
+                    
+                    O:soundPlay(1,0,SoundConfirm)
+                    
+                }      
+                          
+            break
+            
+            case "area3",
+            
+                if(M1){
+                    
+                    TempArea[4,vector] = AimPosLocal
+                    
+                    holoPos(AreaIndex,Ent:toWorld(mix(TempArea[3,vector],AimPosLocal,0.5)))
+                    holoScale(AreaIndex,positive(positive(TempArea[3,vector]-AimPosLocal)/96)+vec(0.01)) 
+                     
+                    O:soundPlay(1,0,SoundConfirm)
+                    Step = "area4"
+                }
+                elseif(R){
+                    
+                    Step = "area2"
+                    
+                    O:soundPlay(1,0,SoundConfirm)
+                    
+                }        
+                        
+            break
+            
+            case "area4",
+            
+                if(M1){
+                    
+                    TempArea[3,vector] = TempArea[3,vector]*vec(1,1,0) + vec(0,0,AimPosLocal:z())
+                    TempArea[4,vector] = TempArea[4,vector]*vec(1,1,0) + vec(0,0,AimPosLocal:z())
+                    TempArea[5,vector] = mix(TempArea[3,vector],TempArea[4,vector],0.5)
+                    TempArea[6,vector] = positive(TempArea[3,vector]-TempArea[4,vector]) 
+
+                    holoPos(AreaIndex,Ent:toWorld(TempArea[5,vector]))
+                    
+                    O:soundPlay(1,0,SoundDone) 
+                    print("Area done.")
+                    Step = ""
+                    Editing = 0
+
+                    UndoHistory:pushString("Area")
+                    Areas:pushArray(TempArea)
+                }
+                elseif(R){
+                    
+                    Step = "area3"
+                    
+                    O:soundPlay(1,0,SoundConfirm)
+                    
+                }                
+            break
+            
+            case "path3",
+            
+                if(M1){
+                    
+                    TempArea[4,vector] = AimPosLocal
+                    
+                    holoInterpolate(AreaIndex,Ent,TempArea[3,vector],TempArea[4,vector])
+
+                    O:soundPlay(1,0,SoundDone) 
+                    print("Path done.")
+                    Step = ""
+                    Editing = 0
+                                       
+                    UndoHistory:pushString("Area")
+                    Areas:pushArray(TempArea)
+                }
+                elseif(R){
+                    
+                    Step = "path2"
+                    
+                    O:soundPlay(1,0,SoundConfirm)
+                    
+                    }
+                    
+            break
+                
+            case "portal1",
+            
+                if(M1){
+                    
+                    Selected = Areas[SelArea,array]
+                    
+                    holoParent(PortalIndex,Selected[1,entity])
+                    
+                    TempPortal[1,number] = SelArea
+
+                    AimPosLocalSelected = round(Selected[1,entity]:toLocal(O:aimPos()),1)
+
+                    if(Selected[2,number] == 0){#Render portal node if it's an area
+                        
+                        local S5 = Selected[5,vector]
+                        local S6 = Selected[6,vector]
+                        
+                        TempPortal[3,vector] = areaClamp(S5,S6,AimPosLocalSelected)
+                        
+                        holoPos(PortalIndex,Selected[1,entity]:toWorld(TempPortal[3,vector]))
+                        
+                    }
+                    else{
+                        
+                        TempPortal[5,number] = linePoint(Selected[3,vector],Selected[4,vector],round(Selected[1,entity]:toLocal(O:aimPos()),1))
+                        
+                        holoPos(PortalIndex,Selected[1,entity]:toWorld(mix(Selected[4,vector],Selected[3,vector],TempPortal[5,number])))
+                        
+                    }
+                    
+                    O:soundPlay(1,0,SoundConfirm)
+                    
+                    Step = "portal2"
+                
+                }
+                elseif(R){
+                    
+                    Step = ""
+                    Editing = 0
+                    
+                    for(I=PortalIndex,PortalIndex+2){holoDelete(I)}
+                    
+                    for(I=1,Areas:count()){holoColor(I-1,vec(50,200,100))}
+                    
+                    O:soundPlay(1,0,SoundCancel)
+                    print("Cancelled portal creation.")
+                    
+                }
+                elseif(M2){
+                    
+                    SelArea += 1
+                    
+                    if(SelArea>Areas:count()){SelArea = 1}
+
+                    for(I=1,Areas:count()){holoColor(I-1,SelArea==I ? vec(50,100,200) :    vec(50,200,100))}
+                    
+                }
+                
+            break
+            
+            case "portal2",
+            
+                if(M1){
+                    
+                    Selected = Areas[SelArea,array]
+                    
+                    holoParent(PortalIndex+1,Selected[1,entity])
+                    
+                    TempPortal[2,number] = SelArea
+
+                    for(I=1,Areas:count()){holoColor(I-1,vec(50,200,100))}
+                    
+                    for(I=PortalIndex,PortalIndex+2){holoColor(I,vec(255,0,255))}
+
+                    AimPosLocalSelected = round(Selected[1,entity]:toLocal(O:aimPos()),1)
+
+                    if(Selected[2,number] == 0){#Render portal node if it's an area
+                        
+                        local S5 = Selected[5,vector]
+                        local S6 = Selected[6,vector]
+                        
+                        TempPortal[4,vector] = areaClamp(S5,S6,AimPosLocalSelected)
+                        
+                        holoPos(PortalIndex+1,Selected[1,entity]:toWorld(TempPortal[4,vector]))
+                        
+                    }
+                    else{
+                        
+                        TempPortal[6,number] = linePoint(Selected[3,vector],Selected[4,vector],round(Selected[1,entity]:toLocal(O:aimPos()),1))
+                        
+                        holoPos(PortalIndex+1,Selected[1,entity]:toWorld(mix(Selected[4,vector],Selected[3,vector],TempPortal[6,number])))
+                        
+                    }
+                    
+                    O:soundPlay(1,0,SoundDone) 
+                    print("Portal done.")
+                    Editing = 0
+                    Step = ""
+                    
+                    UndoHistory:pushString("Portal")
+                    Portals:pushArray(TempPortal)
+                    
+                }
+                elseif(R){
+                    
+                    Step = "portal1"
+                    O:soundPlay(1,0,SoundConfirm)
+                    
+                }
+                elseif(M2){
+                    
+                    SelArea += 1
+                    
+                    if(SelArea>Areas:count()){SelArea = 1}
+                    
+                    for(I=1,Areas:count()){holoColor(I-1,SelArea==I ? vec(50,100,200) :    vec(50,200,100))}
+                    
+                }
+                
+            break
+            
+        }
+        
+    }
+    
+}
+
+
+elseif(clk("export1")){
+    
+    if(perf(80)){
+
+        Wave+=5
+        Indexed = 0
+        for(I=Wave2,min(Wave,ExportAreas:count())){
+            
+            for(J = 1,IndexedEnts:count()){ #For every currently known pair of numbers and entities
+                
+                if(IndexedEnts[J,entity] == ExportAreas[I,array][1,entity]){
+                    
+                    ExportAreas[I,array][1,number] = J
+                    Indexed = 1
+                    
+                    break
+                    
+                }
+                
+            }
+            
+            if(Indexed == 0){ #if the loop was NOT broken manually, add a new entry to the IndexedEnts list.
+                
+                IndexedEnts:pushEntity(ExportAreas[I,array][1,entity])
+                ExportAreas[I,array][1,number] = IndexedEnts:count()
+                
+            }
+            
+            Indexed = 0
+        
+        }
+        Wave2 = Wave +1
+        if(Wave<ExportAreas:count()){
+            
+            timer("export1",0)
+            
+        }
+        else{
+            
+            timer("export2",0)
+            Wave = 0
+            Wave2 = 1
+            print("COPY EVERYTHING BELOW AND PASTE IT INTO THE SIMULATOR E2
+Areas = table(")
+
+        }
+    }
+    else{
+        
+        timer("export1",100)
+        
+    }
+    
+}
+elseif(clk("export2")){
+    
+    if(perf(80)){
+
+        Wave += 5
+        
+        for(I=Wave2,min(Wave,ExportAreas:count())){
+            
+            local A = ExportAreas[I,array]
+                            
+            print("#Area/Path "+I+"
+array( Ent"+A[1,number]+" , "+A[2,number]+" , "+vecToString(A[3,vector])+" , "+vecToString(A[4,vector])+" , "+vecToString(A[5,vector])+" , "+vecToString(A[6,vector])+" )"+(I == ExportAreas:count() ? "" : ",")
+            )
+        }
+        Wave2 = Wave + 1
+        if(Wave<ExportAreas:count()){
+            
+            timer("export2",0)
+            
+        }
+        else{
+            
+            timer("export3",0)
+            Wave = 0
+            Wave2 = 1
+            
+            print(")
+Portals = table(")
+
+        }
+        
+    }
+    else{
+        
+        timer("export2",100)
+        
+    }
+    
+}
+elseif(clk("export3")){
+    
+    if(perf(80)){
+
+        Wave += 5
+        
+        for(I=Wave2,min(Wave,Portals:count())){
+            
+            local A = Portals[I,array]
+                            
+            print("#Portal "+I+"
+array( "+A[1,number]+" , "+A[2,number]+" , "+vecToString(A[3,vector])+" , "+vecToString(A[4,vector])+" , "+A[5,number]+" , "+A[6,number]+" , "+A[7,number]+" , "+A[8,number]+" , 1 )"+(I == Portals:count() ? " " : ",")
+            )
+        }
+        Wave2 = Wave + 1
+        if(Wave<Portals:count()){
+            
+            timer("export3",0)
+            
+        }
+        else{
+            
+            Wave = 0
+            Wave2 = 0
+            print(")
+#Open chat or console and copy all the printed code.")
+            
+        }
+        
+    }
+    else{
+        
+        timer("export3",100)
+        
+    }
+    
+}
