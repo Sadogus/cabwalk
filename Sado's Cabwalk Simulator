@@ -1,8 +1,8 @@
 @name Sado's Cabwalk Simulator
-@inputs LocoControlIn [SeatPod FootplatePod CamController EGPHud]:wirelink 
+@inputs LocoControlIn [SeatPod FootplatePod CamController]:wirelink 
 @inputs [Ent1 Ent2 Ent3 Ent4 Ent5]:entity   #Here you can add more if you use more than 5 parent entities
 @outputs LocoControlOut CurrentArea Active ActivePortal
-@persist SwitchMode UseArrowKeys ShowHud ScrRes:vector2 SeatArea IsPath PathProportion PortalProportion WalkSpeed SprintSpeed PortalSpeed Buttons Crosshair RenderAreas [RangerEnt Driver H0 H1 Footplate Seat AreaParent]:entity Ranger:ranger [Pos1 Pos2 Pos AreaPos AreaScale AreaPos1 AreaPos2 FootplateDefaultPos]:vector [Areas Portals PortalNodes]:table [Area]:array KeyToggle:string FootplateDefaultAng:angle
+@persist Wave Wave2 ReturnToOrigin SwitchMode UseArrowKeys ShowHud ScrRes:vector2 SeatArea IsPath PathProportion PortalProportion WalkSpeed SprintSpeed PortalSpeed Buttons Crosshair RenderAreas [RangerEnt Driver H0 H1 Footplate Seat AreaParent]:entity Ranger:ranger [Pos1 Pos2 Pos AreaPos AreaScale AreaPos1 AreaPos2 FootplateDefaultPos]:vector [Areas Portals]:table [Area]:array KeyToggle:string FootplateDefaultAng:angle
 
 #[
 if(inputClk()){
@@ -13,6 +13,7 @@ if(inputClk()){
     #Portal will work when the input is 1 and locked if the input is 0
     }
 ]#
+if(dupefinished()){reset()}
 if(first()){
     #[
     Welcome to Sado's Cabwalk E2. Before you can simulate an areamap, you have to create it first using the editor included.
@@ -27,11 +28,10 @@ if(first()){
     2. Spawn a seat and a footplate. Place the seat where it should be and don't move the footplate.
     3. Spawn two pod controllers and link them to the seat and footplate by right clicking the pod controllers and seat/footplate respectively.
     4. Spawn a camera controller and link it to the footplate by right clicking both. (Cam Controller settings are listed below)
-    5. Spawn a wire EGP hud and link it to the footplate by right clicking both.
-    6. Link the E2 inputs
+    5. Link the E2 inputs
        The "Ent" inputs should be linked to the parent entities used in the creator in the order they were first selected
        You can enable "RenderAreas" in the settings to see if it's set up correctly
-    7. Refresh the E2
+    6. Refresh the E2
     
     The seat should be parented, but do not parent the footplate
     Read note about playercore below
@@ -43,11 +43,10 @@ if(first()){
     2. Spawn a footplate and place it where it should be.
     3. Spawn a pod controller and link it to the footplate by right clicking both.
     4. Spawn a camera controller and link it to the footplate by right clicking both. (Cam Controller settings are listed below)
-    5. Spawn a wire EGP hud and link it to the footplate by right clicking both.
-    6. Wire the E2 inputs
+    5. Wire the E2 inputs
        The "Ent" inputs should be linked to the parent entities used in the creator in the order they were first selected
        You can enable "RenderAreas" in the settings to see if it's set up correctly
-    7. Refresh the E2
+    6. Refresh the E2
     
     Do not parent the footplate.
     Do not wire the "Allow Buttons" input.
@@ -81,22 +80,22 @@ if(first()){
     
     #Paste the areamap configuration right below this and replace the empty ones
     
-    Areas = table(	
-    #Area/Path 1
-    array( Ent1 , 0 , vec(21.5,32.1,-0.3) , vec(-79.2,117.8,-0.3) , vec(-28.85,74.95,-0.3) , vec(100.7,85.7,0) ),	
-    #Area/Path 2
-    array( Ent2 , 1 , vec(12,-6.9,27.6) , vec(84.2,-69.4,-0.3) , vec(0,0,0) , vec(0,0,0) ),	
-    #Area/Path 3
-    array( Ent2 , 0 , vec(122.8,-60.4,-0.4) , vec(143.5,-121.9,-0.4) , vec(133.15,-91.15,-0.4) , vec(20.7,61.5,0) )	
-    )
-    Portals = table(	
-    #Portal 1
-    array( 1 , 2 , vec(-79.2,32.1,-0.3) , vec(0,0,0) , 0 , 0.81 , 6 , 6 , 1 ),	
-    #Portal 2
-    array( 2 , 3 , vec(0,0,0) , vec(122.8,-75.1,-0.4) , 1 , 0 , 6 , 6 , 1 ),	
-    #Portal 3
-    array( 1 , 3 , vec(-79.2,79.8,-0.3) , vec(122.8,-121.9,-0.4) , 0 , 0 , 6 , 6 , 1 )
-    )
+    
+Areas = table(
+#Area/Path 1
+array( Ent1 , 0 , vec(-41.1,-50.8,-0.3) , vec(43.3,-132.1,-0.3) , vec(1.1,-91.45,-0.3) , vec(84.4,81.3,0) ),
+#Area/Path 2
+array( Ent1 , 1 , vec(12.4,-6.3,41.5) , vec(119.5,-36.8,-0.3) , vec(0,0,0) , vec(0,0,0) ),
+#Area/Path 3
+array( Ent2 , 0 , vec(36.3,17.7,-4) , vec(151.2,-55.7,-4) , vec(93.75,-19,-4) , vec(114.9,73.4,0) )
+)
+Portals = table(
+#Portal 1
+array( 1 , 3 , vec(-41.1,-79.5,-0.3) , vec(36.3,17.7,-4) , 0 , 0 , 6 , 6 , 1 ),
+
+#Portal 2
+array( 1 , 2 , vec(33.8,-50.8,-0.3) , vec(0,0,0) , 0 , 0 , 12 , 3 , 1 ) 
+)
 
 
 
@@ -110,8 +109,8 @@ if(first()){
     Buttons = 1         #Turns on buttons while sitting in the seat
     Crosshair = 1       #Turns on crosshair while sitting in the seat
     UseArrowKeys = 0    #In case you are using a footplate only and you cannot toggle the control of your loco, you can simply change the keys to be arrow keys
-    
-    RenderAreas = 0     #DEBUG: Renders the areas as holograms (similar to the editor)
+    ReturnToOrigin = 0  #If you're using a footplate, this will return its position to the origin, otherwise it will stay where you left it.
+    RenderAreas = 1     #DEBUG: Renders the areas as holograms (similar to the editor)
     SeatArea = 1        #This is the area you will stand in when you toggle it on
     
     
@@ -123,10 +122,6 @@ if(first()){
     timer("parent",100)
     interval(100)    
     runOnLast(1)
-    
-    EGPHud:egpText(1,"You are standing on a node. Right click to switch areas.",vec2(0,-100))
-    EGPHud:egpFont(1,"Trebuchet")
-    EGPHud:egpColor(1,vec(255,221,0))
 
     SeatPod["Allow Buttons",number] = Buttons
     SeatPod["Crosshairs",number] = Crosshair
@@ -166,17 +161,20 @@ if(first()){
     }
 
     function resetPos(){ #resets the position of the footplate when it is turned on/off
+        
+        if(ReturnToOrigin|SwitchMode|first()){
 
-        CurrentArea = SeatArea
+            CurrentArea = SeatArea
+
+        }
+        
         initVariables()
         
         ActivePortal = 0
         PortalProportion = 0
         CamController["Activated",number] = Active
         SeatPod["Lock",number] = Active
-        
-        ScrRes=egpScrSize(Driver)/2
-        
+                
         holoAng(0,AreaParent:toWorld(ang()))
         holoParent(0,AreaParent)
         
@@ -187,6 +185,7 @@ if(first()){
             holoAng(1,holoEntity(0):toWorld(ang(0,holoEntity(0):toLocal(Seat:angles()):yaw(),0)))
             
             if(IsPath == 0){
+                
                 Pos = areaClamp(Area,SeatPosLocal)
                 
             }
@@ -201,19 +200,23 @@ if(first()){
 
                 PathProportion = clamp(PathProportion,0,1)
                 Pos = mix(AreaPos2,AreaPos1,PathProportion)
-                
+                                
             }
             
+            holoPos(0,AreaParent:toWorld(Pos))
+
         }
-        else{
+        elseif(ReturnToOrigin|first()){
             
             Pos = FootplateDefaultPos
             
+            holoPos(0,AreaParent:toWorld(Pos))
+            
         }
         
-        holoPos(0,AreaParent:toWorld(Pos))
         
-    }        
+        
+    }       
 
     initVariables()
         
@@ -266,6 +269,10 @@ if(first()){
 
     if(RenderAreas){
         
+        Wave2 = 2
+        
+        timer("holospawn1",0)
+        
         function holoInterpolate(Index, Parent:entity, Pos1:vector, Pos2:vector){
             
             holoPos(Index,Parent:toWorld((Pos1 + Pos2)/2))
@@ -281,102 +288,7 @@ if(first()){
             holoScale(Index,vec(Pos1:distance(Pos2)/96,0.03,0.03))   
             
         }     
-         
-        for(I = 2, Areas:count()+1){ #render all eht areas
-            
-            local A = Areas[I-1,array]
-            local AP = A[1,entity]
-            
-            holoCreate(I)
-            holoParent(I,A[1,entity])
-            holoModel(I,"models/hunter/blocks/cube2x2x2.mdl")
-            holoMaterial(I,"models/debug/debugwhite")
-            holoColor(I,vec(50,200,100))
-            
-            if(A[2,number] == 0){#Check if it's an area or path
-                
-                holoPos(I,AP:toWorld(A[5,vector]))
-                holoAng(I,AP:toWorld(ang()))
-                holoScale(I,A[6,vector]/96+vec(0,0,0.01))
-                
-            }
-            else{ #Path
-                
-                holoInterpolate(I,AP,A[3,vector],A[4,vector])
-                
-            }           
-             
-        }
-        for(I = 1, Portals:count()){
-            
-            local P = Portals[I,array]
-            local A1 = Areas[P[1,number],array]
-            local A2 = Areas[P[2,number],array]
-            local AP1 = A1[1,entity]
-            local AP2 = A2[1,entity]
-            
-            holoCreate(99+I*3)
-            holoParent(99+I*3,AP1)
-            holoAng(99+I*3,AP1:toWorld(ang()))
-            holoModel(99+I*3,"hqsphere")
-            holoScale(99+I*3,vec(P[7,number]/6))
-            holoColor(99+I*3,vec(255,0,255))
-            
-            holoCreate(100+I*3)
-            holoParent(100+I*3,AP2)
-            holoAng(100+I*3,AP2:toWorld(ang()))
-            holoModel(100+I*3,"hqsphere")
-            holoScale(100+I*3,vec(P[8,number]/6))
-            holoColor(100+I*3,vec(255,0,255))
-            
-            holoCreate(101+I*3)
-            holoParent(101+I*3,AP1)
-            holoModel(101+I*3,"models/hunter/blocks/cube2x2x2.mdl")
-            holoMaterial(101+I*3,"models/debug/debugwhite")
-            holoColor(101+I*3,vec(255,0,255))
-            
-            if(A1[2,number] == 0){ #Check if the first portal point's parent is an area or a path
-                
-                holoPos(99+I*3,AP1:toWorld(P[3,vector]))
-                
-            }
-            else{ #Path
-                
-                holoPos(99+I*3,AP1:toWorld(mix(A1[4,vector],A1[3,vector],P[5,number])))
-                
-            }            
-            if(A2[2,number] == 0){ #Check if the second portal point's parent is an area or a path
-                
-                holoPos(100+I*3,AP2:toWorld(P[4,vector]))
-                
-            }
-            else{ #Path
-                
-                holoPos(100+I*3,AP2:toWorld(mix(A2[4,vector],A2[3,vector],P[6,number])))
-                
-            }        
-            
-        }  
-        
-    }
-    
-    for(I=1,Portals:count()){
-        
-        local P = Portals[I,array]
-        
-        PortalNodes[I*2-1,array] = P
-        PortalNodes[I*2,array] = array(
-            P[2,number],
-            P[1,number],
-            P[4,vector],
-            P[3,vector],
-            P[6,number],
-            P[5,number],
-            P[8,number],
-            P[7,number],
-            P[9,number]
-        )
-        
+
     }
     
 }
@@ -427,7 +339,7 @@ elseif(clk()){
               
             Active = !Active
             resetPos()
-            
+        
         }  
         
     }
@@ -490,27 +402,38 @@ elseif(clk()){
                 
                 Speed = (Shift ? SprintSpeed : WalkSpeed)
                 
-                ShowHud = 0
                 if(IsPath == 0){ #What pos to use if it's an area
                     
                     Pos += (Dir*(W-S)+Dir:rotate(ang(0,90,0))*(A-D))*Speed
                     Pos = areaClamp(Area,Pos)
                     
                     #how portals should act
-                    for(I = 1, PortalNodes:count()){
+                    for(I = 1, Portals:count()){
                         
-                        if(PortalNodes[I,array][1,number] == CurrentArea){
+                        if(Portals[I,array][1,number] == CurrentArea){
                             
-                            local Ptl = PortalNodes[I,array]
+                            local Ptl = Portals[I,array]
                             local Dist = Pos:distance(Ptl[3,vector])   
                                                 
-                            if(Dist < Ptl[7,number]){
+                            if(changed((Dist < Ptl[7,number]))){
                                 
-                                ShowHud = 1
+                                if(Dist < Ptl[7,number]){
+    
+                                    Footplate:printDriver(_HUD_PRINTCENTER,".")
+                                        
+                                }
+                                else{
+                                        
+                                    Footplate:printDriver(_HUD_PRINTCENTER," ")
+    
+                                }
+                                
+                            } 
+                            if(Dist < Ptl[7,number]){
                                 
                                 if(M2&Ptl[9,number]){
                                     
-                                    ShowHud = 0
+                                    Footplate:printDriver(_HUD_PRINTCENTER," ")
                                     ActivePortal = I
                                     Pos1 = Pos
                                     
@@ -519,7 +442,39 @@ elseif(clk()){
                             }
 
                         }
-                        
+                        if(Portals[I,array][2,number] == CurrentArea){
+                            
+                            local Ptl = Portals[I,array]
+                            local Dist = Pos:distance(Ptl[4,vector])   
+                            
+                            if(changed((Dist < Ptl[8,number]))){
+                                
+                                if(Dist < Ptl[8,number]){
+    
+                                    Footplate:printDriver(_HUD_PRINTCENTER,".")
+                                        
+                                }
+                                else{
+                                        
+                                    Footplate:printDriver(_HUD_PRINTCENTER," ")
+    
+                                }
+                                
+                            }           
+                            if(Dist < Ptl[8,number]){
+                                
+                                
+                                if(M2&Ptl[9,number]){
+                                    
+                                    Footplate:printDriver(_HUD_PRINTCENTER," ")
+                                    ActivePortal = I
+                                    Pos1 = Pos
+                                    
+                                }
+                                
+                            }
+
+                        }        
                     }
                     
                 }
@@ -531,20 +486,32 @@ elseif(clk()){
                     Pos = mix(AreaPos2,AreaPos1,PathProportion)
                     
                     #how portals should act
-                    for(I = 1, PortalNodes:count()){
+                    for(I = 1, Portals:count()){
                         
-                        if(PortalNodes[I,array][1,number] == CurrentArea){
+                        if(Portals[I,array][1,number] == CurrentArea){
                             
-                            local Ptl = PortalNodes[I,array]
+                            local Ptl = Portals[I,array]
                             local Dist = Pos:distance(mix(AreaPos2,AreaPos1,Ptl[5,number]))
-                            
+
+                            if(changed((Dist < Ptl[7,number]))){
+                                
+                                if(Dist < Ptl[7,number]){
+    
+                                    Footplate:printDriver(_HUD_PRINTCENTER,".")
+                                        
+                                }
+                                else{
+                                        
+                                    Footplate:printDriver(_HUD_PRINTCENTER," ")
+    
+                                }
+                                
+                            }                             
                             if(Dist < Ptl[7,number]){
-                                
-                                ShowHud = 1
-                                
+                                                                
                                 if(M2&Ptl[9,number]){
                                     
-                                    ShowHud = 0
+                                    Footplate:printDriver(_HUD_PRINTCENTER," ")
                                     ActivePortal = I
                                     Pos1 = Pos
                                     
@@ -553,7 +520,39 @@ elseif(clk()){
                             }
                             
                         }
-                        
+                        if(Portals[I,array][2,number] == CurrentArea){
+                            
+                            local Ptl = Portals[I,array]
+                            local Dist = Pos:distance(mix(AreaPos2,AreaPos1,Ptl[6,number]))
+                            
+                            if(changed((Dist < Ptl[8,number]))){
+                                
+                                if(Dist < Ptl[8,number]){
+    
+                                    Footplate:printDriver(_HUD_PRINTCENTER,".")
+                                        
+                                }
+                                else{
+                                        
+                                    Footplate:printDriver(_HUD_PRINTCENTER," ")
+    
+                                }
+                                
+                            } 
+                            if(Dist < Ptl[8,number]){
+                                
+                                if(M2&Ptl[9,number]){
+                                    
+                                    Footplate:printDriver(_HUD_PRINTCENTER," ")
+                                    ActivePortal = I
+                                    Pos1 = Pos
+                                    
+                                }
+                                
+                            }
+                            
+                        }
+                                
                     }
                     
                 }
@@ -562,51 +561,37 @@ elseif(clk()){
                 
             }
             
-            if(changed(ShowHud)){
-                
-                if(ShowHud){
-                    
-                    EGPHud:egpPos(1,ScrRes*vec2(1,1.5)+vec2(-200,0))
-                    
-                }
-                else{
-                    
-                    EGPHud:egpPos(1,vec2(0,-1000))
-                    
-                }
-                
-            }
-            
         }
         else{ #Travelling through portal
             
-            local Ptl = PortalNodes[ActivePortal,array]
-            local ToArea = Areas[Ptl[2,number],array]
+            local Ptl = Portals[ActivePortal,array]
+            
+            local ToArea = Areas[Ptl[(CurrentArea == Ptl[1,number] ? 2 : 1),number],array]
             
             if(ToArea[2,number] == 0){#Area second pos
                 
-                Pos2 = AreaParent:toLocal(ToArea[1,entity]:toWorld(Ptl[4,vector]))
+                Pos2 = AreaParent:toLocal(ToArea[1,entity]:toWorld(Ptl[(CurrentArea == Ptl[1,number] ? 4 : 3),vector]))
                 
             }
             else{#Path second pos
                 
-                Pos2 = AreaParent:toLocal(ToArea[1,entity]:toWorld(mix(ToArea[4,vector],ToArea[3,vector],Ptl[6,number])))
+                Pos2 = AreaParent:toLocal(ToArea[1,entity]:toWorld(mix(ToArea[4,vector],ToArea[3,vector],Ptl[(CurrentArea == Ptl[1,number] ? 6 : 5),number])))
                 
             }
             
             if(PortalProportion > 1){
                 
-                CurrentArea = Ptl[2,number]
+                CurrentArea = Ptl[(CurrentArea == Ptl[1,number] ? 2 : 1),number]
                 initVariables()
                 
                 if(IsPath == 0){ # area
                     
-                    Pos = Ptl[4,vector]
+                    Pos = Ptl[(CurrentArea == Ptl[2,number] ? 4 : 3),vector]
                     
                 }
                 else{ #path
                     
-                    PathProportion = Ptl[6,number]
+                    PathProportion = Ptl[(CurrentArea == Ptl[2,number] ? 5 : 6),number]
                     
                 }
                 
@@ -639,6 +624,162 @@ elseif(clk("parent")){
 elseif(last()){
     
     Footplate:deparent()
+    
+}
+elseif(clk("holospawn1")){
+    
+    if(perf(80)){
+
+        Wave+=6
+
+        for(I=Wave2,min(Wave,Areas:count()+1)){
+            
+            local A = Areas[I-1,array]
+            local AP = A[1,entity]
+            
+            holoCreate(I)
+            holoParent(I,A[1,entity])
+            holoModel(I,"models/hunter/blocks/cube2x2x2.mdl")
+            holoMaterial(I,"models/debug/debugwhite")
+            holoColor(I,vec(50,200,100))
+            
+            if(A[2,number] == 0){#Check if it's an area or path
+                
+                holoPos(I,AP:toWorld(A[5,vector]))
+                holoAng(I,AP:toWorld(ang()))
+                holoScale(I,A[6,vector]/96+vec(0,0,0.01))
+                
+            }
+            else{ #Path
+                
+                holoInterpolate(I,AP,A[3,vector],A[4,vector])
+                
+            }   
+
+            Digits = (I-1):toString():explode("")
+            
+            for(J=1,Digits:count()){
+                
+                holoCreate(500+I*2+J)
+                holoParent(500+I*2+J,holoEntity(I))
+                holoPos(500+I*2+J,holoEntity(I):toWorld(vec(3-J*2,0,0)))
+                holoAng(500+I*2+J,holoEntity(I):toWorld(ang(0,0,90)))
+                holoModel(500+I*2+J,"models/sprops/misc/alphanum/alphanum_"+Digits[J,string]:toNumber()+".mdl")
+                holoScale(500+I*2+J,vec(0.2,0.4+( A[2,number] ? 0.6 : 0),0.2))
+                holoMaterial(500+I*2+J,"models/debug/debugwhite")
+                holoColor(500+I*2+J,vec(0))
+            
+            }
+
+        }
+        
+        Wave2 = Wave
+        if(Wave<(Areas:count()+1)){
+            
+            timer("holospawn1",1000)
+            
+        }
+        else{
+            
+            timer("holospawn2",1000)
+            Wave = 0
+            Wave2 = 1
+
+        }
+    }
+    else{
+        
+        timer("holospawn1",1000)
+        
+    }
+    
+}
+
+elseif(clk("holospawn2")){
+    
+    if(perf(80)){
+
+        Wave+=6
+
+        for(I=Wave2,min(Wave,Portals:count())){
+            
+            local P = Portals[I,array]
+            local A1 = Areas[P[1,number],array]
+            local A2 = Areas[P[2,number],array]
+            local AP1 = A1[1,entity]
+            local AP2 = A2[1,entity]
+            
+            holoCreate(99+I*3)
+            holoParent(99+I*3,AP1)
+            holoAng(99+I*3,AP1:toWorld(ang()))
+            holoModel(99+I*3,"hqsphere")
+            holoScale(99+I*3,vec(P[7,number]/6))
+            holoColor(99+I*3,vec(255,0,255))
+            
+            holoCreate(100+I*3)
+            holoParent(100+I*3,AP2)
+            holoAng(100+I*3,AP2:toWorld(ang()))
+            holoModel(100+I*3,"hqsphere")
+            holoScale(100+I*3,vec(P[8,number]/6))
+            holoColor(100+I*3,vec(255,0,255))
+            
+            holoCreate(101+I*3)
+            holoParent(101+I*3,AP1)
+            holoModel(101+I*3,"models/hunter/blocks/cube2x2x2.mdl")
+            holoMaterial(101+I*3,"models/debug/debugwhite")
+            holoColor(101+I*3,vec(255,0,255))
+            
+            if(A1[2,number] == 0){ #Check if the first portal point's parent is an area or a path
+                
+                holoPos(99+I*3,AP1:toWorld(P[3,vector]))
+                
+            }
+            else{ #Path
+                
+                holoPos(99+I*3,AP1:toWorld(mix(A1[4,vector],A1[3,vector],P[5,number])))
+                
+            }            
+            if(A2[2,number] == 0){ #Check if the second portal point's parent is an area or a path
+                
+                holoPos(100+I*3,AP2:toWorld(P[4,vector]))
+                
+            }
+            else{ #Path
+                
+                holoPos(100+I*3,AP2:toWorld(mix(A2[4,vector],A2[3,vector],P[6,number])))
+                
+            }  
+
+            Digits = (I):toString():explode("")
+            
+            for(J=1,Digits:count()){
+                
+                holoCreate(1000+I*2+J)
+                holoParent(1000+I*2+J,holoEntity(101+I*3))
+                holoPos(1000+I*2+J,holoEntity(101+I*3):toWorld(vec(3-J*2,0,0)))
+                holoAng(1000+I*2+J,holoEntity(101+I*3):toWorld(ang(0,0,90)))
+                holoModel(1000+I*2+J,"models/sprops/misc/alphanum/alphanum_"+Digits[J,string]:toNumber()+".mdl")
+                holoScale(1000+I*2+J,vec(0.2,1,0.2))
+                holoMaterial(1000+I*2+J,"models/debug/debugwhite")
+                holoColor(1000+I*2+J,vec(0))
+            
+            }
+            
+        }
+        
+        Wave2 = Wave
+        if(Wave<Portals:count()){
+            
+            timer("holospawn2",1000)
+            
+        }
+
+    }
+    else{
+        
+        timer("holospawn2",1000)
+        
+    }
     
 }
 
