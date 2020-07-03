@@ -1,5 +1,5 @@
 @name Sado's Cabwalk Editor
-@outputs SelArea Editing AreaIndex PortalIndex [Areas Portals ExportAreas]:table [IndexedEnts TempArea TempPortal]:array Ent:entity
+@outputs Wave Wave2 SelArea Editing AreaIndex PortalIndex [Areas Portals ExportAreas]:table [IndexedEnts TempArea TempPortal UndoHistory]:array Ent:entity
 @persist [SoundCancel SoundFail SoundDone SoundConfirm Step]:string O:entity
 @model models/props_c17/oildrum001.mdl
 if(first()){
@@ -7,7 +7,7 @@ if(first()){
     Welcome to Sado's Cabwalk Editor E2. You can use this tool to create an areamap.
     
     Making large areamaps may hit the print() limit. Change the print limit by opening your console and typing:
-    wire_expression2_print_max 100
+    wire_expression2_print_max 1000
     
     If the holograms don't spawn, press R to cancel and try again.
     You cannot undo an area/path/portal you have already created. If you confirm an area as a mistake, you have to refresh the E2.
@@ -20,7 +20,8 @@ if(first()){
     "-c export" or "-c e" to export the areamap.
     
     Creating an area:
-    1. First you need to select a parent entity. The parent entity is what the area will be relative to. This would normally be the baseplate. Note the E2 might not work if the baseplate is rotated.
+    1. First you need to select a parent entity. The parent entity is what the area will be relative to. This would normally be the baseplate.
+       Note the E2 might not work if the baseplate is rotated. If the numbers are mirrored, your baseplate is upside down.
     2. Select the starting point of the area. This is the first corner of the area.
     3. Select the second point of the area. This will create a rectangle.
     4. Select the height of the area. In case you want the area to be lower or higher than the points you selected, you can change it here.
@@ -31,7 +32,8 @@ if(first()){
     3. Select the ending point of the path.
     
     Creatnig a portal:
-    1. Select the area/path you want a portal from by right clicking. The selected area will be blue. You can type "-c node <radius>" or "-c n <radius>" to change the radius of the node.
+    1. Select the area/path you want a portal from by right clicking. The selected area will be blue.
+       You can type "-c node <radius>" or "-c n <radius>" to change the radius of the node. You can type "-c sel <area>" or "-c s <area>" to select an area by its index.
     2. Select the area/path you want a portal to by right clicking. Same rules apply.
     
     Exporting configuration:
@@ -72,6 +74,8 @@ if(first()){
     [9,number] - wire input (unused in editor)
     ]#
     
+    
+    UndoHistory = array()
     
     O = owner()
     Areas =  table()
@@ -286,7 +290,7 @@ elseif(chatClk(O)){
                         AreaIndex = Areas:count()
                         Step = "path1"
                         TempArea = array(0,1)  
-                                          
+                                         
                     }
                     else{
                         
@@ -307,7 +311,8 @@ elseif(chatClk(O)){
                         interval(100)
                         PortalIndex = 100 + Portals:count()*3
                         Step = "portal1"
-                        
+                        TempPortal =  array(0,0,0,0,0,0,6,6,1)    
+                    
                     }
                     elseif(Editing){
                         
@@ -356,60 +361,11 @@ elseif(chatClk(O)){
                 case "export",
                 
                     if(!Editing){
-                        
+
                         ExportAreas = Areas:clone()
+                        print("Exporting...")
                         
-                        #Index area entities. Thanks to Sir Metaladon for helping me with this
-                        Indexed = 0
-                        
-                        for(I = 1,ExportAreas:count()){ #For every array in the table
-                            
-                            for(J = 1,IndexedEnts:count()){ #For every currently known pair of numbers and entities
-                                
-                                if(IndexedEnts[J,entity] == ExportAreas[I,array][1,entity]){
-                                    
-                                    ExportAreas[I,array][1,number] = J
-                                    Indexed = 1
-                                    
-                                    break
-                                    
-                                }
-                                
-                            }
-                            
-                            if(Indexed == 0){ #if the loop was NOT broken manually, add a new entry to the IndexedEnts list.
-                                
-                                IndexedEnts:pushEntity(ExportAreas[I,array][1,entity])
-                                ExportAreas[I,array][1,number] = IndexedEnts:count()
-                                
-                            }
-                            
-                            Indexed = 0
-                        }
-    
-                        print("COPY EVERYTHING BELOW AND PASTE IT INTO THE SIMULATOR E2
-Areas = table(")
-                        for(I=1,ExportAreas:count()){
-                            
-                            local A = ExportAreas[I,array]
-                            
-                            print("#Area/Path "+I+"
-array( Ent"+A[1,number]+" , "+A[2,number]+" , "+vecToString(A[3,vector])+" , "+vecToString(A[4,vector])+" , "+vecToString(A[5,vector])+" , "+vecToString(A[6,vector])+" )"+(I == ExportAreas:count() ? "" : ",")
-                            )
-                        }
-                        
-                        print(")
-Portals = table(")
-                        for(I=1,Portals:count()){
-                            
-                            local A = Portals[I,array]
-                            
-                            print("#Portal "+I+"
-array( "+A[1,number]+" , "+A[2,number]+" , "+vecToString(A[3,vector])+" , "+vecToString(A[4,vector])+" , "+A[5,number]+" , "+A[6,number]+" , "+A[7,number]+" , "+A[8,number]+" , 1 )"+(I == Portals:count() ? " " : ",")
-                            )
-                        }
-                        
-                        print(")")
+                        timer("export1",0)
                     }
                     else{
                         
@@ -417,6 +373,74 @@ array( "+A[1,number]+" , "+A[2,number]+" , "+vecToString(A[3,vector])+" , "+vecT
                         O:soundPlay(1,0,SoundFail)
                         
                     }
+                break
+                
+                case "u",
+                case "undo",
+                    
+                    if(UndoHistory:count()){
+                        
+                        Undo = UndoHistory:popString()
+                        
+                        if(Undo == "Area"){
+                                
+                            Areas:popArray()
+                            holoDelete(AreaIndex)
+                            print(AreaIndex)
+                            AreaIndex = Areas:count()-1
+                            print(AreaIndex)
+                        
+                        }
+                        elseif(Undo == "Portal"){
+                                
+                            Portals:popArray()
+                            holoDelete(PortalIndex)
+                            holoDelete(PortalIndex+1)
+                            holoDelete(PortalIndex+2)
+                            PortalIndex = 100 + Portals:count()*3-3
+                        
+                        }
+                        O:soundPlay(1,0,SoundCancel)
+                            
+                    }
+                    else{
+                        
+                        O:soundPlay(1,0,SoundFail)
+                        print("There is nothing to undo.")
+                        
+                    }
+                        
+                    
+                break
+                
+                case "sel",
+                case "s",
+                
+                    if(Step == "portal1" | Step == "portal2"){
+                        
+                        local Word3 = Words[3,string]:toNumber()
+                        
+                        if(Word3 > 0 & Word3 <= Areas:count()){
+                            
+                            SelArea = Word3
+                            for(I=1,Areas:count()){holoColor(I-1,SelArea==I ? vec(50,100,200) :    vec(50,200,100))}
+                            
+                        }
+                        else{
+                            
+                            O:soundPlay(1,0,SoundFail)
+                            print("Error! Area "+Word3+" does not exist!")
+                            
+                            }
+                        
+                    }
+                    else{
+                        
+                        O:soundPlay(1,0,SoundFail)
+                        print("Error! You can only select areas when making portal nodes.")
+                        
+                    }
+                    
                 break
                 
                 default,
@@ -480,6 +504,22 @@ elseif(changed(Step)){
         
             print("Left click the other end of the "+( Step == "area3" ? "area" : "path")+". Press R to undo.")
             
+            Digits = (AreaIndex+1):toString():explode("")
+            
+            for(I=1,Digits:count()){
+                
+                holoCreate(500+AreaIndex*2+I)
+                holoParent(500+AreaIndex*2+I,holoEntity(AreaIndex))
+                holoPos(500+AreaIndex*2+I,holoEntity(AreaIndex):toWorld(vec(3-I*2,0,0)))
+                holoAng(500+AreaIndex*2+I,holoEntity(AreaIndex):toWorld(ang(0,0,90)))
+                holoModel(500+AreaIndex*2+I,"models/sprops/misc/alphanum/alphanum_"+Digits[I,string]:toNumber()+".mdl")
+                holoScale(500+AreaIndex*2+I,vec(0.2,0.4+( Step == "path3" ? 0.6 : 0),0.2))
+                holoMaterial(500+AreaIndex*2+I,"models/debug/debugwhite")
+                holoColor(500+AreaIndex*2+I,vec(0))
+            
+            }
+
+            
             holoModel(AreaIndex,"models/hunter/blocks/cube2x2x2.mdl")
             
         break
@@ -494,7 +534,7 @@ elseif(changed(Step)){
         
         case "portal1",
         
-            print("You are now creating a portal. Right click to cycle through areas. Type '-c node <number>' to change the node radius. Left click to place a node. Press R to cancel.")
+            print("You are now creating a portal. Right click to cycle through areas. Type '-c node <number>' to change the node radius. Type '-c sel <number>' to select area. Left click to place a node. Press R to cancel.")
             
             holoCreate(PortalIndex)
             holoModel(PortalIndex,"hqsphere")
@@ -506,8 +546,6 @@ elseif(changed(Step)){
             holoMaterial(PortalIndex+2,"models/debug/debugwhite")
             holoScale(PortalIndex+2,vec(0.1))
             holoModel(PortalIndex+2,"models/hunter/blocks/cube2x2x2.mdl")
-
-            TempPortal =  array(0,0,0,0,0,0,6,6,1) 
                       
             SelArea = 1
             
@@ -517,12 +555,26 @@ elseif(changed(Step)){
         
         case "portal2",
         
-            print("Now select the other side of the portal. Right click to cycle through areas. Type '-c node <number>' to change the node radius. Press R to cancel.")
+            print("Now select the other side of the portal. Right click to cycle through areas. Type '-c node <number>' to change the node radius. Type '-c sel <number>' to select area. Press R to cancel.")
             
             SelArea = 1
             
             for(I=1,Areas:count()){holoColor(I-1,SelArea==I ? vec(50,100,200) :    vec(50,200,100))}
+
+            Digits = ((PortalIndex-100)/3+1):toString():explode("")
             
+            for(I=1,Digits:count()){
+                
+                holoCreate(1000+PortalIndex*2+I)
+                holoParent(1000+PortalIndex*2+I,holoEntity(PortalIndex+2))
+                holoPos(1000+PortalIndex*2+I,holoEntity(PortalIndex+2):toWorld(vec(3-I*2,0,0)))
+                holoAng(1000+PortalIndex*2+I,holoEntity(PortalIndex+2):toWorld(ang(0,0,90)))
+                holoModel(1000+PortalIndex*2+I,"models/sprops/misc/alphanum/alphanum_"+Digits[I,string]:toNumber()+".mdl")
+                holoScale(1000+PortalIndex*2+I,vec(0.2,1,0.2))
+                holoMaterial(1000+PortalIndex*2+I,"models/debug/debugwhite")
+                holoColor(1000+PortalIndex*2+I,vec(0))
+            
+            }            
         break
         
     }
@@ -633,7 +685,8 @@ elseif(keyClk()){
                     print("Area done.")
                     Step = ""
                     Editing = 0
-                    
+
+                    UndoHistory:pushString("Area")
                     Areas:pushArray(TempArea)
                 }
                 elseif(R){
@@ -657,7 +710,8 @@ elseif(keyClk()){
                     print("Path done.")
                     Step = ""
                     Editing = 0
-                    
+                                       
+                    UndoHistory:pushString("Area")
                     Areas:pushArray(TempArea)
                 }
                 elseif(R){
@@ -769,6 +823,7 @@ elseif(keyClk()){
                     Editing = 0
                     Step = ""
                     
+                    UndoHistory:pushString("Portal")
                     Portals:pushArray(TempPortal)
                     
                 }
@@ -797,4 +852,133 @@ elseif(keyClk()){
 }
 
 
+elseif(clk("export1")){
+    
+    if(perf(80)){
 
+        Wave+=5
+        Indexed = 0
+        for(I=Wave2,min(Wave,ExportAreas:count())){
+            
+            for(J = 1,IndexedEnts:count()){ #For every currently known pair of numbers and entities
+                
+                if(IndexedEnts[J,entity] == ExportAreas[I,array][1,entity]){
+                    
+                    ExportAreas[I,array][1,number] = J
+                    Indexed = 1
+                    
+                    break
+                    
+                }
+                
+            }
+            
+            if(Indexed == 0){ #if the loop was NOT broken manually, add a new entry to the IndexedEnts list.
+                
+                IndexedEnts:pushEntity(ExportAreas[I,array][1,entity])
+                ExportAreas[I,array][1,number] = IndexedEnts:count()
+                
+            }
+            
+            Indexed = 0
+        
+        }
+        Wave2 = Wave
+        if(Wave<ExportAreas:count()){
+            
+            timer("export1",0)
+            
+        }
+        else{
+            
+            timer("export2",0)
+            Wave = 0
+            Wave2 = 1
+            print("COPY EVERYTHING BELOW AND PASTE IT INTO THE SIMULATOR E2
+Areas = table(")
+
+        }
+    }
+    else{
+        
+        timer("export1",100)
+        
+    }
+    
+}
+elseif(clk("export2")){
+    
+    if(perf(80)){
+
+        Wave += 5
+        
+        for(I=Wave2,min(Wave,ExportAreas:count())){
+            
+            local A = ExportAreas[I,array]
+                            
+            print("#Area/Path "+I+"
+array( Ent"+A[1,number]+" , "+A[2,number]+" , "+vecToString(A[3,vector])+" , "+vecToString(A[4,vector])+" , "+vecToString(A[5,vector])+" , "+vecToString(A[6,vector])+" )"+(I == ExportAreas:count() ? "" : ",")
+            )
+        }
+        Wave2 = Wave + 1
+        if(Wave<ExportAreas:count()){
+            
+            timer("export2",0)
+            
+        }
+        else{
+            
+            timer("export3",0)
+            Wave = 0
+            Wave2 = 1
+            
+            print(")
+Portals = table(")
+
+        }
+        
+    }
+    else{
+        
+        timer("export2",100)
+        
+    }
+    
+}
+elseif(clk("export3")){
+    
+    if(perf(80)){
+
+        Wave += 5
+        
+        for(I=Wave2,min(Wave,Portals:count())){
+            
+            local A = Portals[I,array]
+                            
+            print("#Portal "+I+"
+array( "+A[1,number]+" , "+A[2,number]+" , "+vecToString(A[3,vector])+" , "+vecToString(A[4,vector])+" , "+A[5,number]+" , "+A[6,number]+" , "+A[7,number]+" , "+A[8,number]+" , 1 )"+(I == Portals:count() ? " " : ",")
+            )
+        }
+        Wave2 = Wave + 1
+        if(Wave<Portals:count()){
+            
+            timer("export3",0)
+            
+        }
+        else{
+            
+            Wave = 0
+            Wave2 = 0
+            print(")
+#Open chat or console and copy all the printed code.")
+            
+        }
+        
+    }
+    else{
+        
+        timer("export3",100)
+        
+    }
+    
+}
